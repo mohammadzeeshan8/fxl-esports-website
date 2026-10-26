@@ -1,0 +1,45 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>FXL Admin</title><style>
+*{box-sizing:border-box}body{margin:0;background:#000;color:#fff;font:15px Inter,system-ui,sans-serif}
+button,input,select,.btn{background:#0d0d0d;color:#fff;border:1px solid #2a2a2a;padding:9px 12px;font:inherit;cursor:pointer;text-decoration:none}
+button:hover{border-color:#60E3B9;color:#60E3B9}.btn{background:#60E3B9;color:#000;border-color:#60E3B9;display:inline-block}
+#login{display:grid;gap:12px;width:min(320px,90vw);margin:20vh auto}h1{text-transform:uppercase;letter-spacing:.05em;margin:0 0 18px}
+#app{display:none;min-height:100vh}aside{width:230px;padding:24px;border-right:1px solid rgba(96,227,185,.18)}aside b{display:block;color:#60E3B9;letter-spacing:.15em;margin-bottom:24px}
+aside .nav{display:flex;justify-content:space-between;padding:10px 0}.badge{background:#60E3B9;color:#000;border-radius:99px;padding:0 9px;font-weight:700;font-size:13px}
+main{flex:1;padding:32px;min-width:0}.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:12px;border-bottom:1px solid #1c1c1c;white-space:nowrap}th{color:#A3A3A3;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+.st{border:1px solid #60E3B9;color:#60E3B9;padding:2px 9px;font-size:12px}.st.New{background:#60E3B9;color:#000}.st.Archived{border-color:#555;color:#A3A3A3}
+#mo{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;place-items:center;padding:16px;overflow:auto}#mo.on{display:grid}
+.md{background:#050505;border:1px solid rgba(96,227,185,.3);padding:28px;max-width:640px;width:100%;position:relative}.x{position:absolute;right:8px;top:6px;border:0;font-size:24px}
+dl{display:grid;grid-template-columns:100px 1fr;gap:6px 12px}dt{color:#A3A3A3}dd{margin:0;word-break:break-word}.msg{white-space:pre-wrap;background:#0d0d0d;padding:14px;border:1px solid #1c1c1c}.acts{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:700px){#app.on{flex-direction:column}aside{width:auto;border:0;border-bottom:1px solid #1c1c1c}}#app.on{display:flex}
+</style></head><body>
+<form id="login"><h1>FXL Admin</h1><input type="password" id="pw" placeholder="Password" required autofocus><button>Sign in</button><p id="le"></p></form>
+<div id="app"><aside><b>FXL ADMIN</b><div class="nav"><span>Contact Messages</span><span class="badge" id="bd" hidden></span></div><button id="out" style="margin-top:20px">Log out</button></aside>
+<main><h1>Contact Messages</h1><div class="bar"><input id="q" placeholder="Search name, email or subject"><select id="f"><option value="inbox">Inbox (no archived)</option><option>All</option><option>New</option><option>Read</option><option>Replied</option><option>Archived</option></select></div>
+<div class="tw"><table><thead><tr><th>Sender Name</th><th>Email Address</th><th>Inquiry Type</th><th>Subject</th><th>Date Received</th><th>Status</th><th>Actions</th></tr></thead><tbody id="tb"></tbody></table></div></main></div>
+<div id="mo"><div class="md"><button class="x" id="cx" aria-label="Close">×</button><h2 id="ms"></h2><dl id="dl"></dl><p class="msg" id="mm"></p><div class="acts" id="ac"></div></div></div>
+<script>
+const $=s=>document.querySelector(s),ST=['New','Read','Replied','Archived'],fmt=d=>new Date(d).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
+const E=(t,x,c)=>{const e=document.createElement(t);if(x!=null)e.textContent=x;if(c)e.className=c;return e};
+const show=v=>{$('#login').style.display=v?'none':'grid';$('#app').classList.toggle('on',v)};
+async function api(p,o={}){const r=await fetch(p,{credentials:'same-origin',headers:{'Content-Type':'application/json'},...o});if(r.status===401){show(false);throw 0}const j=await r.json().catch(()=>({}));if(!r.ok)throw j.error||'Error';return j}
+let rows=[],cur=null,tm;
+async function load(){try{const j=await api('/api/admin/messages?q='+encodeURIComponent($('#q').value)+'&status='+$('#f').value);rows=j.messages;show(true);
+$('#bd').hidden=!j.newCount;$('#bd').textContent=j.newCount;const tb=$('#tb');tb.replaceChildren();
+if(!rows.length){const tr=E('tr'),td=E('td','No messages found.');td.colSpan=7;tr.append(td);tb.append(tr)}
+rows.forEach(m=>{const tr=E('tr');[m.name,m.email,m.inquiry_type,m.subject,fmt(m.created_at)].forEach(v=>tr.append(E('td',v)));
+const s=E('td');s.append(E('span',m.status,'st '+m.status));tr.append(s);const a=E('td'),v=E('button','View');v.onclick=()=>view(m);a.append(v);
+if(m.status!=='Archived'){const r=E('button','Archive');r.onclick=()=>set(m,'Archived');a.append(' ',r)}tr.append(a);tb.append(tr)})}catch(e){if(e)alert(e)}}
+async function set(m,status){try{await api('/api/admin/messages',{method:'PATCH',body:JSON.stringify({id:m.id,status})});m.status=status;if(cur&&cur.id===m.id)draw(m);load()}catch(e){if(e)alert(e)}}
+function view(m){if(m.status==='New')set(m,'Read').then(()=>{});draw(m);$('#mo').classList.add('on')}
+function draw(m){cur=m;$('#ms').textContent=m.subject;const dl=$('#dl');dl.replaceChildren();
+[['Name',m.name],['Email',m.email],['Discord',m.discord||'—'],['Category',m.inquiry_type],['Received',fmt(m.created_at)],['Status',m.status==='New'?'Read':m.status]].forEach(([k,v])=>dl.append(E('dt',k),E('dd',v)));
+$('#mm').textContent=m.message;const ac=$('#ac');ac.replaceChildren();
+const re=E('a','Reply by email','btn');re.href='mailto:'+encodeURIComponent(m.email).replace('%40','@')+'?subject='+encodeURIComponent('Re: '+m.subject);ac.append(re);
+ST.filter(s=>s!==(m.status==='New'?'Read':m.status)).forEach(s=>{const b=E('button','Mark '+s);b.onclick=()=>set(m,s);ac.append(b)})}
+$('#cx').onclick=()=>{$('#mo').classList.remove('on');cur=null};$('#mo').onclick=e=>{if(e.target.id==='mo')$('#cx').click()};
+$('#login').onsubmit=async e=>{e.preventDefault();try{await api('/api/admin/login',{method:'POST',body:JSON.stringify({password:$('#pw').value})});$('#pw').value='';load()}catch(x){$('#le').textContent='Wrong password'}};
+$('#out').onclick=async()=>{await fetch('/api/admin/login',{method:'DELETE',credentials:'same-origin'});show(false)};
+$('#q').oninput=()=>{clearTimeout(tm);tm=setTimeout(load,300)};$('#f').onchange=load;load();
+</script></body></html>
